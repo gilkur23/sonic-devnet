@@ -1,11 +1,11 @@
 const fs = require('fs');
 const colors = require('colors');
-const bs58 = require('bs58'); // Pastikan bs58 diinstal
+const bs58 = require('bs58');
 
 const {
   sendSol,
   generateRandomAddresses,
-  getKeypairFromPrivateKey, // Ini sudah diimpor
+  getKeypairFromPrivateKey,
   PublicKey,
   connection,
   LAMPORTS_PER_SOL,
@@ -15,16 +15,13 @@ const {
 const { displayHeader } = require('./src/displayUtils');
 
 (async () => {
-  // Tampilkan header
   displayHeader();
 
-  // Tentukan parameter otomatis
-  const addressCount = 100; // Jumlah alamat acak
-  const amountToSend = 0.001; // Jumlah SOL yang dikirim
-  const delayBetweenTx = 1000; // Delay antara transaksi dalam milidetik
+  const addressCount = 100;
+  const amountToSend = 0.001;
+  const delayBetweenTx = 1000;
 
-  // Ambil seed phrases atau private keys dari file
-  const method = '1'; // Misalnya, Anda selalu menggunakan private key
+  const method = '1';
   let seedPhrasesOrKeys;
   if (method === '0') {
     seedPhrasesOrKeys = JSON.parse(fs.readFileSync('accounts.json', 'utf-8'));
@@ -40,10 +37,8 @@ const { displayHeader } = require('./src/displayUtils');
     throw new Error(colors.red('Metode input yang dipilih tidak valid'));
   }
 
-  // Generate alamat acak
   const randomAddresses = generateRandomAddresses(addressCount);
 
-  // Dapatkan jumlah minimum saldo untuk pengecualian sewa
   let rentExemptionAmount;
   try {
     rentExemptionAmount =
@@ -71,14 +66,13 @@ const { displayHeader } = require('./src/displayUtils');
     return;
   }
 
-  // Proses setiap private key
   for (const [index, privateKey] of seedPhrasesOrKeys.entries()) {
     let fromKeypair;
     try {
       fromKeypair = getKeypairFromPrivateKey(privateKey);
     } catch (error) {
       console.error(colors.red(`Gagal membuat keypair dari private key ke-${index + 1}:`), error);
-      continue; // Lanjutkan ke private key berikutnya jika terjadi kesalahan
+      continue;
     }
 
     console.log(
@@ -87,7 +81,6 @@ const { displayHeader } = require('./src/displayUtils');
       )
     );
 
-    // Kirim SOL ke setiap alamat acak
     for (const address of randomAddresses) {
       const toPublicKey = new PublicKey(address);
       try {
