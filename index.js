@@ -5,7 +5,7 @@ const bs58 = require('bs58'); // Pastikan bs58 diinstal
 const {
   sendSol,
   generateRandomAddresses,
-  getKeypairFromPrivateKey,
+  getKeypairFromPrivateKey, // Ini sudah diimpor
   PublicKey,
   connection,
   LAMPORTS_PER_SOL,
@@ -13,19 +13,6 @@ const {
 } = require('./src/solanaUtils');
 
 const { displayHeader } = require('./src/displayUtils');
-
-// Mengonversi base58 secret key ke dalam format byte array
-const getKeypairFromPrivateKey = (base58SecretKey) => {
-  try {
-    const secretKeyBytes = bs58.decode(base58SecretKey);
-    if (secretKeyBytes.length !== 64) {
-      throw new Error('Ukuran kunci rahasia tidak valid. Seharusnya 64 byte.');
-    }
-    return Keypair.fromSecretKey(secretKeyBytes);
-  } catch (error) {
-    throw new Error(`Gagal mengonversi dan membuat keypair dari private key: ${error.message}`);
-  }
-};
 
 (async () => {
   // Tampilkan header
