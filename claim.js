@@ -11,6 +11,10 @@ const readlineSync = require('readline-sync');
 const moment = require('moment');
 const fetch = require('node-fetch'); // Import node-fetch
 
+// Konfigurasi Telegram
+const botToken = 'YOUR_BOT_TOKEN';
+const chatId = 'YOUR_CHAT_ID';
+
 const PRIVATE_KEYS = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
 
 // Struktur untuk melacak status
@@ -46,7 +50,7 @@ async function getToken(privateKey) {
 
     return response.data.data.token;
   } catch (error) {
-    console.log(`Error fetching token: ${error}`.red);
+    console.error(`Error fetching token: ${error.message}`.red);
   }
 }
 
@@ -60,7 +64,7 @@ async function getProfile(token) {
 
     return data.data;
   } catch (error) {
-    console.log(`Error fetching profile: ${error}`.red);
+    console.error(`Error fetching profile: ${error.message}`.red);
   }
 }
 
@@ -76,7 +80,7 @@ async function doTransactions(tx, keypair, retries = 3) {
       await new Promise((res) => setTimeout(res, 1000));
       return doTransactions(tx, keypair, retries - 1);
     } else {
-      console.log(`Error in transaction: ${error}`.red);
+      console.error(`Error in transaction: ${error.message}`.red);
       throw error;
     }
   }
@@ -108,7 +112,7 @@ async function openMysteryBox(token, keypair, retries = 3) {
       await new Promise((res) => setTimeout(res, 1000));
       return openMysteryBox(token, keypair, retries - 1);
     } else {
-      console.log(`Error opening mystery box: ${error}`.red);
+      console.error(`Error opening mystery box: ${error.message}`.red);
       throw error;
     }
   }
@@ -124,7 +128,7 @@ async function fetchDaily(token) {
 
     return data.data.total_transactions;
   } catch (error) {
-    console.log(`[ ${moment().format('HH:mm:ss')} ] Error in daily fetching: ${error.response.data.message}`.red);
+    console.error(`[ ${moment().format('HH:mm:ss')} ] Error in daily fetching: ${error.response?.data?.message}`.red);
   }
 }
 
@@ -140,7 +144,7 @@ async function dailyClaim(token) {
       while (counter <= maxCounter) {
         try {
           const { data } = await axios({
-            url: 'https://odyssey-api.sonic.game/user/transactions/rewards/claim',
+            url: 'https://odyssey-api-beta.sonic.game/user/transactions/rewards/claim',
             method: 'POST',
             headers: { ...HEADERS, Authorization: `Bearer ${token}` },
             data: { stage: counter },
@@ -149,14 +153,14 @@ async function dailyClaim(token) {
           console.log(`[ ${moment().format('HH:mm:ss')} ] Klaim harian untuk tahap ${counter} berhasil! Tahap: ${counter} | Status: ${data.data.claimed}`.green);
           counter++;
         } catch (error) {
-          if (error.response.data.message === 'interact task not finished') {
+          if (error.response?.data?.message === 'interact task not finished') {
             console.log(`[ ${moment().format('HH:mm:ss')} ] Error klaim tahap ${counter}: ${error.response.data.message}`.red);
             counter++;
           } else if (error.response && (error.response.data.code === 100015 || error.response.data.code === 100016)) {
             console.log(`[ ${moment().format('HH:mm:ss')} ] Sudah diklaim untuk tahap ${counter}, melanjutkan ke tahap berikutnya...`.cyan);
             counter++;
           } else {
-            console.log(`[ ${moment().format('HH:mm:ss')} ] Error klaim: ${error.response.data.message}`.red);
+            console.error(`[ ${moment().format('HH:mm:ss')} ] Error klaim: ${error.response?.data?.message}`.red);
           }
         } finally {
           await delay(1000);
@@ -168,7 +172,7 @@ async function dailyClaim(token) {
       throw new Error('Tidak cukup transaksi untuk klaim hadiah.');
     }
   } catch (error) {
-    console.log(`[ ${moment().format('HH:mm:ss')} ] Error dalam klaim harian: ${error.message}`.red);
+    console.error(`[ ${moment().format('HH:mm:ss')} ] Error dalam klaim harian: ${error.message}`.red);
   }
 }
 
@@ -193,11 +197,11 @@ async function dailyLogin(token, keypair, retries = 3) {
 
     return response.data;
   } catch (error) {
-    if (error.response.data.message === 'current account already checked in') {
-      console.log(`[ ${moment().format('HH:mm:ss')} ] Error dalam login harian: ${error.response.data.message}`.red);
+    if (error.response?.data?.message === 'current account already checked in') {
+      console.error(`[ ${moment().format('HH:mm:ss')} ] Error dalam login harian: ${error.response.data.message}`.red);
       status.dailyLogin.failed++;
     } else {
-      console.log(`[ ${moment().format('HH:mm:ss')} ] Error klaim: ${error.response.data.message}`.red);
+      console.error(`[ ${moment().format('HH:mm:ss')} ] Error klaim: ${error.response?.data?.message}`.red);
       status.dailyLogin.failed++;
     }
   }
@@ -214,116 +218,64 @@ async function processPrivateKey(privateKey) {
       const ringBalance = profile.ring;
       const availableBoxes = profile.ring_monitor;
       console.log(`Halo ${publicKey}! Selamat datang di bot kami. Berikut detail Anda:`.green);
-      console.log(`Saldo Solana: ${balance} SOL`.green);
-      console.log(`Saldo Ring: ${ringBalance}`.green);
-      console.log(`Kotak yang Tersedia: ${availableBoxes}`.green);
-      console.log('');
+      console.log(`Saldo Solana: ${balance} SOL`.cyan);
+      console.log(`Saldo Ring: ${ringBalance}`.cyan);
+      console.log(`Kotak Misteri Tersedia: ${availableBoxes}`.cyan);
 
-      // Langsung menjalankan proses otomatis
-      console.log(`[ ${moment().format('HH:mm:ss')} ] Mohon tunggu...`.yellow);
-
-      // 1. Login Harian
-      const claimLogin = await dailyLogin(token, getKeypair(privateKey));
-      if (claimLogin) {
-        console.log(`[ ${moment().format('HH:mm:ss')} ] Login harian berhasil! Status: ${claimLogin.status} | Hari Berturut-turut: ${claimLogin.data.accumulative_days}`.green);
-        status.dailyLogin.success++;
-      } else {
-        status.dailyLogin.failed++;
-      }
-
-      // 2. Klaim Kotak
+      // Operasi harian
       await dailyClaim(token);
+      await dailyLogin(token, getKeypair(privateKey));
 
-      // 3. Membuka Kotak
-      let totalClaim;
+      // Menggunakan kotak misteri
       if (availableBoxes > 0) {
-        totalClaim = availableBoxes; // Buka semua kotak yang tersedia
-        console.log(`[ ${moment().format('HH:mm:ss')} ] Membuka ${totalClaim} kotak...`.yellow);
-        status.openBoxes.total += totalClaim;
-        for (let i = 0; i < totalClaim; i++) {
-          const openedBox = await openMysteryBox(token, getKeypair(privateKey));
-          if (openedBox.data.success) {
-            console.log(`[ ${moment().format('HH:mm:ss')} ] Kotak berhasil dibuka! Status: ${openedBox.status} | Jumlah: ${openedBox.data.amount}`.green);
-            status.openBoxes.opened++;
-          } else {
-            console.log(`[ ${moment().format('HH:mm:ss')} ] Error membuka kotak: ${openedBox.data.error}`.red);
-          }
-        }
-        console.log(`[ ${moment().format('HH:mm:ss')} ] Semua kotak telah dibuka!`.cyan);
-      } else {
-        console.log(`[ ${moment().format('HH:mm:ss')} ] Tidak ada kotak yang tersedia untuk dibuka.`.yellow);
+        const boxResult = await openMysteryBox(token, getKeypair(privateKey));
+        console.log(`Hasil kotak misteri: ${boxResult.data}`.cyan);
+        status.openBoxes.opened++;
       }
-    } else {
-      console.log(`Mungkin ada kesalahan jika saldo Anda tidak mencukupi atau RPC sedang tidak aktif. Pastikan saldo Anda cukup dan koneksi Anda stabil`.red);
     }
   } catch (error) {
-    console.log(`Error memproses private key: ${error}`.red);
+    console.error(`[ ${moment().format('HH:mm:ss')} ] Error dalam pemrosesan private key ${privateKey}: ${error.message}`.red);
   }
-  console.log('');
 }
 
-// Fungsi untuk mengirim pesan Telegram
 async function sendTelegramMessage(botToken, chatId, message) {
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  const payload = {
-    chat_id: chatId,
-    text: message,
-    parse_mode: 'HTML'
-  };
-
   try {
-    const response = await fetch(url, {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+      }),
     });
-
-    if (response.ok) {
-      console.log('Notification sent successfully.');
-    } else {
-      console.log(`Failed to send notification. Status code: ${response.status}`);
-    }
+    console.log('Pesan Telegram berhasil dikirim.'.green);
   } catch (error) {
-    console.error(`Error sending notification: ${error.message}`);
+    console.error(`Error mengirim pesan ke Telegram: ${error.message}`.red);
   }
 }
 
 (async () => {
   try {
     displayHeader();
-    console.log('Bot akan melakukan langkah-langkah berikut:');
-    console.log('1. Login harian untuk setiap akun.');
-    console.log('2. Klaim hadiah harian berdasarkan transaksi.');
-    console.log('3. Membuka semua kotak misteri yang tersedia.');
-    console.log('');
-
-    for (let i = 0; i < PRIVATE_KEYS.length; i++) {
-      const privateKey = PRIVATE_KEYS[i];
+    for (const privateKey of PRIVATE_KEYS) {
       await processPrivateKey(privateKey);
-      if (i < PRIVATE_KEYS.length - 1) {
-        const continueNext = readlineSync.keyInYNStrict('Apakah Anda ingin memproses private key berikutnya?');
-        if (!continueNext) break;
-      }
     }
-    
-    // Cetak ringkasan status
+
     const summaryMessage = `
-      Ringkasan Operasi:
-      1. Pengiriman SOL: ${status.sendSol.success} berhasil, ${status.sendSol.failed} gagal
-      2. Login Harian: ${status.dailyLogin.success} berhasil, ${status.dailyLogin.failed} gagal
-      3. Membuka Kotak: ${status.openBoxes.opened} dari ${status.openBoxes.total} kotak berhasil dibuka
-    `;
-    console.log(summaryMessage.cyan);
-    
-    // Kirim ringkasan ke Telegram
-    const botToken = 'YOUR_BOT_TOKEN';
-    const chatId = 'YOUR_CHAT_ID';
+    Ringkasan Operasi:
+    - Solana Terkirim: ${status.sendSol.success} Berhasil, ${status.sendSol.failed} Gagal
+    - Login Harian: ${status.dailyLogin.success} Berhasil, ${status.dailyLogin.failed} Gagal
+    - Kotak Misteri: ${status.openBoxes.opened} Dibuka
+
+    Bot By HCA EDIT By SKW
+    `.trim();
+
     await sendTelegramMessage(botToken, chatId, summaryMessage);
 
     console.log('Semua private key telah diproses.'.cyan);
   } catch (error) {
     console.log(`Terjadi kesalahan dalam operasi bot: ${error}`.red);
   } finally {
-    console.log('Terima kasih telah menggunakan bot kami! Subscribe: https://t.me/HappyCuanAirdrop'.magenta);
+    console.log('Bot By HCA EDIT By SKW '.magenta);
   }
 })();
