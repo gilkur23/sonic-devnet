@@ -9,8 +9,16 @@ const { HEADERS } = require('./src/headers');
 const { displayHeader } = require('./src/displayUtils');
 const readlineSync = require('readline-sync');
 const moment = require('moment');
+const fetch = require('node-fetch'); // Import node-fetch
 
 const PRIVATE_KEYS = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
+
+// Struktur untuk melacak status
+const status = {
+  sendSol: { success: 0, failed: 0 },
+  dailyLogin: { success: 0, failed: 0 },
+  openBoxes: { total: 0, opened: 0 },
+};
 
 function getKeypair(privateKey) {
   const decodedPrivateKey = base58.decode(privateKey);
@@ -21,16 +29,11 @@ async function getToken(privateKey) {
   try {
     const { data } = await axios({
       url: 'https://odyssey-api-beta.sonic.game/auth/sonic/challenge',
-      params: {
-        wallet: getKeypair(privateKey).publicKey.toBase58(),
-      },
+      params: { wallet: getKeypair(privateKey).publicKey.toBase58() },
       headers: HEADERS,
     });
 
-    const sign = nacl.sign.detached(
-      Buffer.from(data.data),
-      getKeypair(privateKey).secretKey
-    );
+    const sign = nacl.sign.detached(Buffer.from(data.data), getKeypair(privateKey).secretKey);
     const signature = Buffer.from(sign).toString('base64');
     const publicKey = getKeypair(privateKey).publicKey;
     const encodedPublicKey = Buffer.from(publicKey.toBytes()).toString('base64');
@@ -38,11 +41,7 @@ async function getToken(privateKey) {
       url: 'https://odyssey-api-beta.sonic.game/auth/sonic/authorize',
       method: 'POST',
       headers: HEADERS,
-      data: {
-        address: publicKey.toBase58(),
-        address_encoded: encodedPublicKey,
-        signature,
-      },
+      data: { address: publicKey.toBase58(), address_encoded: encodedPublicKey, signature },
     });
 
     return response.data.data.token;
@@ -99,9 +98,7 @@ async function openMysteryBox(token, keypair, retries = 3) {
       url: 'https://odyssey-api-beta.sonic.game/user/rewards/mystery-box/open',
       method: 'POST',
       headers: { ...HEADERS, Authorization: `Bearer ${token}` },
-      data: {
-        hash: signature,
-      },
+      data: { hash: signature },
     });
 
     return response.data;
@@ -137,7 +134,6 @@ async function dailyClaim(token) {
 
   try {
     const fetchDailyResponse = await fetchDaily(token);
-
     console.log(`[ ${moment().format('HH:mm:ss')} ] Total transaksi Anda: ${fetchDailyResponse}`.blue);
 
     if (fetchDailyResponse > 10) {
@@ -147,13 +143,10 @@ async function dailyClaim(token) {
             url: 'https://odyssey-api.sonic.game/user/transactions/rewards/claim',
             method: 'POST',
             headers: { ...HEADERS, Authorization: `Bearer ${token}` },
-            data: {
-              stage: counter,
-            },
+            data: { stage: counter },
           });
 
           console.log(`[ ${moment().format('HH:mm:ss')} ] Klaim harian untuk tahap ${counter} berhasil! Tahap: ${counter} | Status: ${data.data.claimed}`.green);
-
           counter++;
         } catch (error) {
           if (error.response.data.message === 'interact task not finished') {
@@ -191,22 +184,21 @@ async function dailyLogin(token, keypair, retries = 3) {
     const tx = solana.Transaction.from(txBuffer);
     tx.partialSign(keypair);
     const signature = await doTransactions(tx, keypair);
-
     const response = await axios({
       url: 'https://odyssey-api-beta.sonic.game/user/check-in',
       method: 'POST',
       headers: { ...HEADERS, Authorization: `Bearer ${token}` },
-      data: {
-        hash: signature,
-      },
+      data: { hash: signature },
     });
 
     return response.data;
   } catch (error) {
     if (error.response.data.message === 'current account already checked in') {
       console.log(`[ ${moment().format('HH:mm:ss')} ] Error dalam login harian: ${error.response.data.message}`.red);
+      status.dailyLogin.failed++;
     } else {
       console.log(`[ ${moment().format('HH:mm:ss')} ] Error klaim: ${error.response.data.message}`.red);
+      status.dailyLogin.failed++;
     }
   }
 }
@@ -229,25 +221,32 @@ async function processPrivateKey(privateKey) {
 
       // Langsung menjalankan proses otomatis
       console.log(`[ ${moment().format('HH:mm:ss')} ] Mohon tunggu...`.yellow);
-      
+
       // 1. Login Harian
       const claimLogin = await dailyLogin(token, getKeypair(privateKey));
       if (claimLogin) {
         console.log(`[ ${moment().format('HH:mm:ss')} ] Login harian berhasil! Status: ${claimLogin.status} | Hari Berturut-turut: ${claimLogin.data.accumulative_days}`.green);
+        status.dailyLogin.success++;
+      } else {
+        status.dailyLogin.failed++;
       }
-      
+
       // 2. Klaim Kotak
       await dailyClaim(token);
-      
+
       // 3. Membuka Kotak
       let totalClaim;
       if (availableBoxes > 0) {
         totalClaim = availableBoxes; // Buka semua kotak yang tersedia
         console.log(`[ ${moment().format('HH:mm:ss')} ] Membuka ${totalClaim} kotak...`.yellow);
+        status.openBoxes.total += totalClaim;
         for (let i = 0; i < totalClaim; i++) {
           const openedBox = await openMysteryBox(token, getKeypair(privateKey));
           if (openedBox.data.success) {
             console.log(`[ ${moment().format('HH:mm:ss')} ] Kotak berhasil dibuka! Status: ${openedBox.status} | Jumlah: ${openedBox.data.amount}`.green);
+            status.openBoxes.opened++;
+          } else {
+            console.log(`[ ${moment().format('HH:mm:ss')} ] Error membuka kotak: ${openedBox.data.error}`.red);
           }
         }
         console.log(`[ ${moment().format('HH:mm:ss')} ] Semua kotak telah dibuka!`.cyan);
@@ -261,6 +260,32 @@ async function processPrivateKey(privateKey) {
     console.log(`Error memproses private key: ${error}`.red);
   }
   console.log('');
+}
+
+// Fungsi untuk mengirim pesan Telegram
+async function sendTelegramMessage(botToken, chatId, message) {
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  const payload = {
+    chat_id: chatId,
+    text: message,
+    parse_mode: 'HTML'
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      console.log('Notification sent successfully.');
+    } else {
+      console.log(`Failed to send notification. Status code: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error sending notification: ${error.message}`);
+  }
 }
 
 (async () => {
@@ -280,6 +305,21 @@ async function processPrivateKey(privateKey) {
         if (!continueNext) break;
       }
     }
+    
+    // Cetak ringkasan status
+    const summaryMessage = `
+      Ringkasan Operasi:
+      1. Pengiriman SOL: ${status.sendSol.success} berhasil, ${status.sendSol.failed} gagal
+      2. Login Harian: ${status.dailyLogin.success} berhasil, ${status.dailyLogin.failed} gagal
+      3. Membuka Kotak: ${status.openBoxes.opened} dari ${status.openBoxes.total} kotak berhasil dibuka
+    `;
+    console.log(summaryMessage.cyan);
+    
+    // Kirim ringkasan ke Telegram
+    const botToken = 'YOUR_BOT_TOKEN';
+    const chatId = 'YOUR_CHAT_ID';
+    await sendTelegramMessage(botToken, chatId, summaryMessage);
+
     console.log('Semua private key telah diproses.'.cyan);
   } catch (error) {
     console.log(`Terjadi kesalahan dalam operasi bot: ${error}`.red);
