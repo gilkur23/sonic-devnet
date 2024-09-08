@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "claim": "node claim.js",
-    "run-all": "npm run start && npm run claim", 
+    "run-all": "npm run start && npm run claim",
     "run-allvps": "node scheduler.js"
   },
   "keywords": [],
@@ -23,6 +23,6 @@
     "moment": "^2.30.1",
     "readline-sync": "^1.4.10",
     "tweetnacl": "^1.0.3",
-    "node-fetch": "^3.3.2"  // Menambahkan node-fetch sebagai dependensi
+    "node-fetch": "^3.3.2"
   }
 }
