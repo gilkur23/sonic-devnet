@@ -139,69 +139,46 @@ async function processPrivateKey(privateKey) {
       console.log(`Available Box(es): ${availableBoxes}`.green);
       console.log('');
 
-      const method = readlineSync.question(
-        'Select input method (1 for claim box, 2 for open box, 3 for daily login): '
-      );
-
-      if (method === '1') {
-        console.log(`[ ${moment().format('HH:mm:ss')} ] Please wait...`.yellow);
-        await dailyClaim(token);
+      // Langsung menjalankan proses otomatis
+      console.log(`[ ${moment().format('HH:mm:ss')} ] Please wait...`.yellow);
+      
+      // 1. Login Harian
+      const claimLogin = await dailyLogin(token, getKeypair(privateKey));
+      if (claimLogin) {
         console.log(
-          `[ ${moment().format('HH:mm:ss')} ] All tasks completed!`.cyan
+          `[ ${moment().format('HH:mm:ss')} ] Daily login has been success! Status: ${
+            claimLogin.status
+          } | Accumulative Days: ${claimLogin.data.accumulative_days}`.green
         );
-      } else if (method === '2') {
-        let totalClaim;
-        do {
-          totalClaim = readlineSync.question(
-            `How many boxes do you want to open? (Maximum is: ${availableBoxes}): `
-              .blue
-          );
-
-          if (totalClaim > availableBoxes) {
-            console.log(`You cannot open more boxes than available`.red);
-          } else if (isNaN(totalClaim)) {
-            console.log(`Please enter a valid number`.red);
-          } else {
+      }
+      
+      // 2. Klaim Kotak
+      await dailyClaim(token);
+      
+      // 3. Membuka Kotak
+      let totalClaim;
+      if (availableBoxes > 0) {
+        totalClaim = availableBoxes; // Buka semua kotak yang tersedia
+        console.log(`[ ${moment().format('HH:mm:ss')} ] Opening ${totalClaim} box(es)...`.yellow);
+        for (let i = 0; i < totalClaim; i++) {
+          const openedBox = await openMysteryBox(token, getKeypair(privateKey));
+          if (openedBox.data.success) {
             console.log(
-              `[ ${moment().format('HH:mm:ss')} ] Please wait...`.yellow
-            );
-            for (let i = 0; i < totalClaim; i++) {
-              const openedBox = await openMysteryBox(
-                token,
-                getKeypair(privateKey)
-              );
-              if (openedBox.data.success) {
-                console.log(
-                  `[ ${moment().format(
-                    'HH:mm:ss'
-                  )} ] Box opened successfully! Status: ${
-                    openedBox.status
-                  } | Amount: ${openedBox.data.amount}`.green
-                );
-              }
-            }
-            console.log(
-              `[ ${moment().format('HH:mm:ss')} ] All tasks completed!`.cyan
+              `[ ${moment().format(
+                'HH:mm:ss'
+              )} ] Box opened successfully! Status: ${
+                openedBox.status
+              } | Amount: ${openedBox.data.amount}`.green
             );
           }
-        } while (totalClaim > availableBoxes);
-      } else if (method === '3') {
-        console.log(`[ ${moment().format('HH:mm:ss')} ] Please wait...`.yellow);
-        const claimLogin = await dailyLogin(token, getKeypair(privateKey));
-        if (claimLogin) {
-          console.log(
-            `[ ${moment().format(
-              'HH:mm:ss'
-            )} ] Daily login has been success! Status: ${
-              claimLogin.status
-            } | Accumulative Days: ${claimLogin.data.accumulative_days}`.green
-          );
         }
         console.log(
-          `[ ${moment().format('HH:mm:ss')} ] All tasks completed!`.cyan
+          `[ ${moment().format('HH:mm:ss')} ] All boxes opened!`.cyan
         );
       } else {
-        throw new Error('Invalid input method selected'.red);
+        console.log(
+          `[ ${moment().format('HH:mm:ss')} ] No boxes available to open.`.yellow
+        );
       }
     } else {
       console.log(
@@ -360,6 +337,12 @@ async function dailyLogin(token, keypair, retries = 3) {
     for (let i = 0; i < PRIVATE_KEYS.length; i++) {
       const privateKey = PRIVATE_KEYS[i];
       await processPrivateKey(privateKey);
+      if (i < PRIVATE_KEYS.length - 1) {
+        const continueNext = readlineSync.keyInYNStrict(
+          `Do you want to process next private key?`
+        );
+        if (!continueNext) break;
+      }
     }
     console.log('All private keys processed.'.cyan);
   } catch (error) {
