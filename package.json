@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "claim": "node claim.js",
-    "run-all": "npm run start && npm run claim",
+    "run-all": "node index.js && node claim.js",
     "run-allvps": "node scheduler.js"
   },
   "keywords": [],
