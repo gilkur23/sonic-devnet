@@ -27,16 +27,25 @@ function runScript(scriptName) {
   });
 }
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 (async () => {
-  try {
-    console.log('Running index.js...');
-    await runScript('index.js');
+  while (true) {
+    try {
+      console.log('Running index.js...');
+      await runScript('index.js');
+      
+      console.log('Running claim.js...');
+      await runScript('claim.js');
+      
+      console.log('Both scripts have been executed successfully.');
+    } catch (error) {
+      console.error(`Error during script execution: ${error.message}`);
+    }
     
-    console.log('Running claim.js...');
-    await runScript('claim.js');
-    
-    console.log('Both scripts have been executed successfully.');
-  } catch (error) {
-    console.error(`Error during script execution: ${error.message}`);
+    console.log('Waiting for 24 hours before running scripts again...');
+    await delay(24 * 60 * 60 * 1000); 
   }
 })();
