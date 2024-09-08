@@ -1,10 +1,11 @@
 const fs = require('fs');
 const colors = require('colors');
+const bs58 = require('bs58'); // Pastikan bs58 diinstal
 
 const {
   sendSol,
   generateRandomAddresses,
-  getKeypairFromSeed,
+  getKeypairFromPrivateKey,
   PublicKey,
   connection,
   LAMPORTS_PER_SOL,
@@ -13,19 +14,43 @@ const {
 
 const { displayHeader } = require('./src/displayUtils');
 
+// Mengonversi base58 secret key ke dalam format byte array
+const getKeypairFromPrivateKey = (base58SecretKey) => {
+  try {
+    const secretKeyBytes = bs58.decode(base58SecretKey);
+    if (secretKeyBytes.length !== 64) {
+      throw new Error('Ukuran kunci rahasia tidak valid. Seharusnya 64 byte.');
+    }
+    return Keypair.fromSecretKey(secretKeyBytes);
+  } catch (error) {
+    throw new Error(`Gagal mengonversi dan membuat keypair dari private key: ${error.message}`);
+  }
+};
+
 (async () => {
   // Tampilkan header
   displayHeader();
 
-  // Parameter otomatis
+  // Tentukan parameter otomatis
   const addressCount = 100; // Jumlah alamat acak
   const amountToSend = 0.001; // Jumlah SOL yang dikirim
   const delayBetweenTx = 1000; // Delay antara transaksi dalam milidetik
 
-  // Ambil seed phrases dari file
-  const seedPhrases = JSON.parse(fs.readFileSync('accounts.json', 'utf-8'));
-  if (!Array.isArray(seedPhrases) || seedPhrases.length === 0) {
-    throw new Error(colors.red('accounts.json tidak diatur dengan benar atau kosong'));
+  // Ambil seed phrases atau private keys dari file
+  const method = '1'; // Misalnya, Anda selalu menggunakan private key
+  let seedPhrasesOrKeys;
+  if (method === '0') {
+    seedPhrasesOrKeys = JSON.parse(fs.readFileSync('accounts.json', 'utf-8'));
+    if (!Array.isArray(seedPhrasesOrKeys) || seedPhrasesOrKeys.length === 0) {
+      throw new Error(colors.red('accounts.json tidak diatur dengan benar atau kosong'));
+    }
+  } else if (method === '1') {
+    seedPhrasesOrKeys = JSON.parse(fs.readFileSync('privateKeys.json', 'utf-8'));
+    if (!Array.isArray(seedPhrasesOrKeys) || seedPhrasesOrKeys.length === 0) {
+      throw new Error(colors.red('privateKeys.json tidak diatur dengan benar atau kosong'));
+    }
+  } else {
+    throw new Error(colors.red('Metode input yang dipilih tidak valid'));
   }
 
   // Generate alamat acak
@@ -59,14 +84,14 @@ const { displayHeader } = require('./src/displayUtils');
     return;
   }
 
-  // Proses setiap seed phrase
-  for (const [index, seedPhrase] of seedPhrases.entries()) {
+  // Proses setiap private key
+  for (const [index, privateKey] of seedPhrasesOrKeys.entries()) {
     let fromKeypair;
     try {
-      fromKeypair = await getKeypairFromSeed(seedPhrase);
+      fromKeypair = getKeypairFromPrivateKey(privateKey);
     } catch (error) {
-      console.error(colors.red(`Gagal membuat keypair dari seed phrase ke-${index + 1}:`), error);
-      continue; // Lanjutkan ke seed phrase berikutnya jika terjadi kesalahan
+      console.error(colors.red(`Gagal membuat keypair dari private key ke-${index + 1}:`), error);
+      continue; // Lanjutkan ke private key berikutnya jika terjadi kesalahan
     }
 
     console.log(
