@@ -27,8 +27,20 @@ function runScript(scriptName) {
   });
 }
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+async function delayWithCountdown(ms) {
+  const startTime = Date.now();
+  const endTime = startTime + ms;
+
+  while (Date.now() < endTime) {
+    const remainingTime = endTime - Date.now();
+    const hours = Math.floor(remainingTime / (1000 * 60 * 60));
+    const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((remainingTime % (1000 * 60)) / 1000);
+
+    console.log(`Waiting for ${hours}h ${minutes}m ${seconds}s before running scripts again...`);
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 }
 
 (async () => {
@@ -46,6 +58,6 @@ function delay(ms) {
     }
     
     console.log('Waiting for 24 hours before running scripts again...');
-    await delay(24 * 60 * 60 * 1000); 
+    await delayWithCountdown(24 * 60 * 60 * 1000); // 24 jam dalam milidetik
   }
 })();
