@@ -1,4 +1,6 @@
+const cron = require('node-cron');
 const { exec } = require('child_process');
+require('colors');
 
 function runScript(scriptName) {
   return new Promise((resolve, reject) => {
@@ -14,50 +16,34 @@ function runScript(scriptName) {
 
     process.on('close', (code) => {
       if (code !== 0) {
-        console.error(`Process ${scriptName} exited with code ${code}`);
+        console.error(`Process ${scriptName} exited with code ${code}`.red);
         return reject(new Error(`Process ${scriptName} exited with code ${code}`));
       }
       resolve();
     });
 
     process.on('error', (err) => {
-      console.error(`Error executing ${scriptName}: ${err.message}`);
+      console.error(`Error executing ${scriptName}: ${err.message}`.red);
       reject(err);
     });
   });
 }
 
-async function delayWithCountdown(ms) {
-  const startTime = Date.now();
-  const endTime = startTime + ms;
+cron.schedule('10 0 * * *', async () => {
+  try {
+    console.log('Running index.js at 07:10 WIB...'.green);
+    await runScript('index.js');
 
-  while (Date.now() < endTime) {
-    const remainingTime = endTime - Date.now();
-    const hours = Math.floor(remainingTime / (1000 * 60 * 60));
-    const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((remainingTime % (1000 * 60)) / 1000);
+    console.log('Running claim.js at 07:10 WIB...'.green);
+    await runScript('claim.js');
 
-    console.log(`Waiting for ${hours}h ${minutes}m ${seconds}s before running scripts again...`);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Both scripts have been executed successfully.'.green);
+  } catch (error) {
+    console.error(`Error during script execution: ${error.message}`.red);
   }
-}
+}, {
+  scheduled: true,
+  timezone: "UTC"
+});
 
-(async () => {
-  while (true) {
-    try {
-      console.log('Running index.js...');
-      await runScript('index.js');
-      
-      console.log('Running claim.js...');
-      await runScript('claim.js');
-      
-      console.log('Both scripts have been executed successfully.');
-    } catch (error) {
-      console.error(`Error during script execution: ${error.message}`);
-    }
-    
-    console.log('Waiting for 24 hours before running scripts again...');
-    await delayWithCountdown(24 * 60 * 60 * 1000); // 24 jam dalam milidetik
-  }
-})();
+console.log('Cron job scheduled to run every day at 07:10 WIB.'.cyan);
