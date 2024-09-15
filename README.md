@@ -5,8 +5,10 @@
 ## Fitur
 * Otomatis send 100 tx 
 * Otomatis daily login 
-* Otomatis claim box tx 
-* Otomatis buka box
+* Otomatis claim box tx Milestone 
+* Otomatis buka semua box
+* Kirim Status sukses atau gagal ke telegram
+
 ### [Link Testnet](https://odyssey.sonic.game/?join=waiivL)
 
 ### [Bot Ori](https://github.com/dante4rt/sonic-odyssey-bot) by HCA (HappyCuanAirdrop) 
@@ -35,14 +37,44 @@ nano privateKeys.json
   "privatekey3"
 ]
 ```
-5. Jalankan bot
+5. Jalankan bot Manual 
+
+Send sol 100x
 ```
-npm run all
+node index.js
 ```
-6. Jalankan bot otomatis ( khusus vps dalam tmux/screen)
+Daily Login
+```
+node daily.js
+```
+Buka Kotak Tx Milestone
+```
+node opentx.js
+```
+Buka Semua box ring
+```
+node openbox.js
+```
+
+6. Jalankan bot otomatis ( bisa langsung run setiap hari )
 ```
 node auto.js
 ```
+\
+\
+\
+Untuk Memggunakan fitur send status ke Telegram edit file `.env`
+```
+nano .env
+```
+Format `.env`
+```
+TELEGRAM_BOT_TOKEN=Isi API bot kalian
+TELEGRAM_CHAT_ID=Isi User id Telegram
+```
+Contoh `.env` \
+TELEGRAM_BOT_TOKEN=123456789:AAErhakaYXXkzk1DBiksss_AgB1wGSa \
+TELEGRAM_CHAT_ID=123456789 \
 \
 \
 *Gunakan Vps mempermudah pertuyulan*
