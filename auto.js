@@ -4,13 +4,10 @@ const schedule = require('node-schedule');
 
 function runCommand(command) {
   return new Promise((resolve, reject) => {
-    // Pisahkan command menjadi bagian-bagian yang bisa diterima spawn
     const [cmd, ...args] = command.split(' ');
 
-    // Jalankan proses
     const process = spawn(cmd, args, { stdio: 'pipe' });
 
-    // Tangani output stdout dan stderr secara real-time
     process.stdout.on('data', (data) => {
       console.log(`\n${data}`);
     });
