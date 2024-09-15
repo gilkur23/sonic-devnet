@@ -1,6 +1,8 @@
+require('dotenv').config();
 const fs = require('fs');
 const colors = require('colors');
 const bs58 = require('bs58');
+const { sendTelegramMessage } = require('./sendTelegramMessage'); // Impor fungsi
 
 const {
   sendSol,
@@ -66,8 +68,12 @@ const { displayHeader } = require('./src/displayUtils');
     return;
   }
 
+  const summary = [];
+
   for (const [index, privateKey] of seedPhrasesOrKeys.entries()) {
     let fromKeypair;
+    let successfulTransactions = 0;
+    let failedTransactions = 0;
     try {
       fromKeypair = getKeypairFromPrivateKey(privateKey);
     } catch (error) {
@@ -85,15 +91,33 @@ const { displayHeader } = require('./src/displayUtils');
       const toPublicKey = new PublicKey(address);
       try {
         await sendSol(fromKeypair, toPublicKey, amountToSend);
+        successfulTransactions++;
         console.log(
           colors.green(`Berhasil mengirim ${amountToSend} SOL ke ${address}`)
         );
       } catch (error) {
+        failedTransactions++;
         console.error(colors.red(`Gagal mengirim SOL ke ${address}:`), error);
       }
       await delay(delayBetweenTx);
     }
+
+    if (failedTransactions === 0) {
+      summary.push(`Akun ${index + 1} : Berhasil mengirim sebanyak ${successfulTransactions}`);
+    } else {
+      summary.push(`Akun ${index + 1} : Gagal mengirim ${failedTransactions} transaksi (Berhasil ${successfulTransactions} transaksi)`);
+    }
   }
 
+  const summaryMessage = 'Ringkasan Send Sol:\n' + summary.join('\n');
+  
   console.log(colors.cyan('Semua transaksi selesai.'));
+  console.log(summaryMessage);
+
+  try {
+    await sendTelegramMessage(summaryMessage);
+    console.log('Ringkasan berhasil dikirim ke Telegram.'.green);
+  } catch (error) {
+    console.error('Gagal mengirim ringkasan ke Telegram:', error.message.red);
+  }
 })();
