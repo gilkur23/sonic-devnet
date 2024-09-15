@@ -1,49 +1,90 @@
-const cron = require('node-cron');
-const { exec } = require('child_process');
-require('colors');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const schedule = require('node-schedule');
 
-function runScript(scriptName) {
+function runCommand(command) {
   return new Promise((resolve, reject) => {
-    const process = exec(`node ${scriptName}`);
+    // Pisahkan command menjadi bagian-bagian yang bisa diterima spawn
+    const [cmd, ...args] = command.split(' ');
 
+    // Jalankan proses
+    const process = spawn(cmd, args, { stdio: 'pipe' });
+
+    // Tangani output stdout dan stderr secara real-time
     process.stdout.on('data', (data) => {
-      console.log(`${data}`);
+      console.log(`\n${data}`);
     });
 
     process.stderr.on('data', (data) => {
-      console.error(`${data}`);
+      console.error(`\n${data}`);
     });
 
     process.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`Process ${scriptName} exited with code ${code}`.red);
-        return reject(new Error(`Process ${scriptName} exited with code ${code}`));
+      if (code === 0) {
+        resolve(`Completed: ${command}`);
+      } else {
+        reject(new Error(`Command ${command} failed with exit code ${code}`));
       }
-      resolve();
-    });
-
-    process.on('error', (err) => {
-      console.error(`Error executing ${scriptName}: ${err.message}`.red);
-      reject(err);
     });
   });
 }
 
-cron.schedule('10 0 * * *', async () => {
+async function runCommands() {
   try {
-    console.log('Running index.js at 07:10 WIB...'.green);
-    await runScript('index.js');
+    console.log('Starting the sequence of commands...');
 
-    console.log('Running claim.js at 07:10 WIB...'.green);
-    await runScript('claim.js');
+    console.log('Running node index.js...');
+    await runCommand('node index.js');
+    console.log('Completed: node index.js');
 
-    console.log('Both scripts have been executed successfully.'.green);
+    console.log('Running node daily.js...');
+    await runCommand('node daily.js');
+    console.log('Completed: node daily.js');
+
+    console.log('Running node opentx.js...');
+    await runCommand('node opentx.js');
+    console.log('Completed: node opentx.js');
+
+    console.log('Running node openbox.js...');
+    await runCommand('node openbox.js');
+    console.log('Completed: node openbox.js');
   } catch (error) {
-    console.error(`Error during script execution: ${error.message}`.red);
+    console.error('Error running commands:', error);
   }
-}, {
-  scheduled: true,
-  timezone: "UTC"
-});
+}
 
-console.log('Cron job scheduled to run every day at 07:10 WIB.'.cyan);
+function scheduleNextRun() {
+  const now = new Date();
+  const nextRun = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, now.getHours(), now.getMinutes(), 0, 0);
+
+  schedule.scheduleJob(nextRun, () => {
+    console.log(`Scheduled task started at ${nextRun}`);
+    runCommands();
+    scheduleNextRun();
+  });
+
+  fs.writeFileSync('lastRunTime.txt', now.toISOString(), 'utf-8');
+  console.log(`First run time recorded: ${now.toISOString()}`);
+}
+
+(async () => {
+  const lastRunTime = fs.existsSync('lastRunTime.txt') ? fs.readFileSync('lastRunTime.txt', 'utf-8') : null;
+
+  if (lastRunTime) {
+    const lastRunDate = new Date(lastRunTime);
+    const now = new Date();
+
+    if (now > lastRunDate) {
+      console.log('Running commands immediately due to missed schedule.');
+      await runCommands();
+      scheduleNextRun();
+    } else {
+      console.log('Rescheduling for the next day.');
+      scheduleNextRun();
+    }
+  } else {
+    console.log('First time execution.');
+    await runCommands();
+    scheduleNextRun();
+  }
+})();
