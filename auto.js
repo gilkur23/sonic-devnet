@@ -1,7 +1,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const schedule = require('node-schedule');
-const { sendTelegramMessage } = require('./sendTelegramMessage');
+const { sendTelegramMessage } = require('./sendTelegramMessage'); // Import the function
 
 function runCommand(command) {
   return new Promise((resolve, reject) => {
@@ -43,6 +43,9 @@ async function runCommands() {
     console.log('Running node openbox.js...');
     await runCommand('node openbox.js');
 
+    console.log('Running node ring.js...');
+    await runCommand('node ring.js');
+
     // Collecting all summaries
     const summaries = [];
     if (fs.existsSync('summary_index.json')) {
@@ -61,10 +64,13 @@ async function runCommands() {
       const openboxSummary = JSON.parse(fs.readFileSync('summary_openbox.json', 'utf-8'));
       summaries.push(openboxSummary.summaryMessage);
     }
-
+    if (fs.existsSync('summary_ring.json')) {
+      const ringSummary = JSON.parse(fs.readFileSync('summary_ring.json', 'utf-8'));
+      summaries.push(ringSummary.summaryMessage);
+    }
     const finalSummaryMessage = summaries.join('\n');
     console.log(`Ringkasan Terbaru:\n${finalSummaryMessage}`);
-    await sendTelegramMessage(finalSummaryMessage); 
+    await sendTelegramMessage(finalSummaryMessage); // Send the combined message
   } catch (error) {
     console.error('Error running commands:', error);
   }
