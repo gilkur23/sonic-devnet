@@ -149,9 +149,9 @@ async function openAllBoxes(privateKey) {
     const totalSuccessful = successfulClaims.length;
     const totalFailed = failedClaims.length;
 
-    const summaryMessage = `*Buka Semua Mistery Box*\nSukses: ${totalSuccessful} Akun\nGagal: ${totalFailed} Akun`;
+    const summaryMessage = `*Buka Semua Mistery Box*\nSukses: ${totalSuccessful} Akun\nGagal: ${totalFailed} Akun\n\n`;
     fs.writeFileSync('summary_openbox.json', JSON.stringify({ summaryMessage }));
-    console.log(summaryMessage);
+    console.log(summaryMessage.green);
 
   } catch (error) {
     console.log(`Terjadi kesalahan: ${error.message}`.red);
