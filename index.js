@@ -17,7 +17,7 @@ const { displayHeader } = require('./src/displayUtils');
 (async () => {
   displayHeader();
 
-  const addressCount = 100;
+  const addressCount = 1;
   const amountToSend = 0.001;
   const delayBetweenTx = 1000;
 
@@ -64,8 +64,6 @@ const { displayHeader } = require('./src/displayUtils');
   const formattedDate = now.format('Do MMMM YYYY');
   const summaryMessage = `*Sonic Devnet ${formattedDate}*\n\n*Send Sol 100x*\nSukses: ${totalSuccessful} Akun\nGagal: ${totalFailed} Akun\n`;
   fs.writeFileSync('summary_index.json', JSON.stringify({ summaryMessage }));
-  console.log(colors.cyan('Semua transaksi selesai.'));
-  console.log(summaryMessage);
-
+  console.log(summaryMessage.green);
 
 })();
