@@ -1,4 +1,4 @@
-# Sonic Odyssey Testnet
+# Sonic Odyssey Devnet
 
 
 
@@ -22,7 +22,8 @@ git clone https://github.com/gilkur23/sonic && cd sonic
 
 2. Install Nodejs & module
 ```
-nvm install 20.10.0 && nvm use 20.10.0 && npm i 
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash && source ~/.bashrc && nvm install v22.3.0 && nvm use v22.3.0 && nvm alias default v22.3.0
+ && npm i 
 ```
 
 3. Edit Private Key `privateKeys.json`
